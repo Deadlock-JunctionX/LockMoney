@@ -12,6 +12,7 @@ from src import dto, model
 from src.background import BackgroundJobExecutor
 from src.demo_data import reset_to_demo_data
 from src.passhash import verify_password
+
 config = AppConfig()
 job_executor = BackgroundJobExecutor()
 
@@ -26,18 +27,22 @@ app.config["SQLALCHEMY_ENGINE_OPTIONS"] = {"pool_size": 5}
 
 model.db.init_app(app)
 
+
 @app.errorhandler(ValidationError)
 def handle_exception(e: ValidationError):
-    return ({
-        "detail": str(e)
-    }, 422)
+    return ({"detail": str(e)}, 422)
+
 
 # API routes
+
 
 @app.route("/api/login", methods=["POST"])
 def login():
     req = dto.LoginRequest.parse_obj(flask.request.json)
-    matched_user = model.User.find(phone=req.phone)
+    matched_user = model.db.session.scalars(
+        model.db.select(model.User).where(model.User.phone == req.phone)
+    ).first()
+
     if matched_user is None:
         return dict(detail="Invalid login"), 401
 
@@ -50,16 +55,20 @@ def login():
     )
     return dto.LoginResponse(token=access_token).dict()
 
+
 # Utility routes
+
 
 @app.route("/api/debug/demo-data", methods=["POST"])
 def reset_data():
     reset_to_demo_data()
     return "OK", 200
 
+
 @app.route("/")
 def homepage():
     return app.send_static_file("index.html")
+
 
 @app.route("/<path:path>")
 def serve_static_file(path):
