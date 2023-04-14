@@ -9,7 +9,7 @@ dev: build stop
     docker-compose logs -f
 
 new-revision message:
-    alembic revision --autogenerate -m {{ message }}
+    alembic revision --autogenerate -m '{{ message }}'
 
 migrate:
     alembic upgrade head
