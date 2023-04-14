@@ -1,8 +1,10 @@
 import flask
 import flask_jwt_extended as JWT
+import functools
 
 from pydantic.error_wrappers import ValidationError
 from flask import Flask
+from datetime import timedelta
 from flask_cors import CORS
 from flask_jwt_extended import JWTManager
 from sqlalchemy.pool import NullPool
@@ -33,6 +35,22 @@ def handle_exception(e: ValidationError):
     return ({"detail": str(e)}, 422)
 
 
+def with_user(fn):
+    @functools.wraps(fn)
+    def decorate(*args, **kwargs):
+        user_id = JWT.get_jwt_identity()
+        user = model.db.session.scalars(
+            model.db.select(model.User).where(model.User.id == user_id)
+        ).first()
+        if user is None:
+            return dict(detail="Invalid token"), 400
+
+        flask.g.user = user
+        return fn(*args, **kwargs)
+
+    return decorate
+
+
 # API routes
 
 
@@ -52,8 +70,50 @@ def login():
 
     access_token = JWT.create_access_token(
         identity=matched_user.id,
+        expires_delta=timedelta(days=7),
     )
     return dto.LoginResponse(token=access_token).dict()
+
+
+@app.get("/api/users/me/info")
+@JWT.jwt_required()
+@with_user
+def get_current_user_info():
+    current_user = flask.g.user
+    return dto.UserInfoDto(
+        id=current_user.id,
+        name=current_user.name,
+        phone=current_user.phone
+    ).dict()
+
+
+@app.get("/api/users/me/accounts")
+@JWT.jwt_required()
+@with_user
+def get_current_user_accounts():
+    limit = flask.request.args.get("limit", 10)
+
+    current_user = flask.g.user
+    accounts = model.db.session.scalars(
+        model.db.select(model.UserAccount).where(model.UserAccount.user_id == current_user.id).order_by(model.UserAccount.priority.desc()).limit(limit)
+    ).all()
+
+    return dto.AccountListDto(
+        items=[
+            dto.AccountDto(
+                id=item.id,
+                user_id=item.user_id,
+                initial_balance=item.initial_balance,
+                balance=item.balance,
+                type=item.type,
+                bank_id=item.bank_id,
+                bank_account_number=item.bank_account_number,
+                bank_card_number=item.bank_card_number,
+                priority=item.priority,
+            )
+            for item in accounts
+        ]
+    ).dict()
 
 
 # Utility routes
