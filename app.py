@@ -7,7 +7,8 @@ from flask import Flask
 from datetime import timedelta
 from flask_cors import CORS
 from flask_jwt_extended import JWTManager
-from sqlalchemy.pool import NullPool
+from sqlalchemy import orm
+from loguru import logger
 
 from src.config import AppConfig
 from src import dto, model
@@ -15,6 +16,7 @@ from src.background import BackgroundJobExecutor
 from src.demo_data import reset_to_demo_data
 from src.passhash import verify_password
 
+logger.level("INFO")
 config = AppConfig()
 job_executor = BackgroundJobExecutor()
 
@@ -28,6 +30,7 @@ app.config["SQLALCHEMY_DATABASE_URI"] = config.db_uri
 app.config["SQLALCHEMY_ENGINE_OPTIONS"] = {"pool_size": 5}
 
 model.db.init_app(app)
+
 
 
 @app.errorhandler(ValidationError)
@@ -81,9 +84,7 @@ def login():
 def get_current_user_info():
     current_user = flask.g.user
     return dto.UserInfoDto(
-        id=current_user.id,
-        name=current_user.name,
-        phone=current_user.phone
+        id=current_user.id, name=current_user.name, phone=current_user.phone
     ).dict()
 
 
@@ -95,7 +96,10 @@ def get_current_user_accounts():
 
     current_user = flask.g.user
     accounts = model.db.session.scalars(
-        model.db.select(model.UserAccount).where(model.UserAccount.user_id == current_user.id).order_by(model.UserAccount.priority.desc()).limit(limit)
+        model.db.select(model.UserAccount)
+        .where(model.UserAccount.user_id == current_user.id)
+        .order_by(model.UserAccount.priority.desc())
+        .limit(limit)
     ).all()
 
     return dto.AccountListDto(
@@ -113,6 +117,129 @@ def get_current_user_accounts():
             )
             for item in accounts
         ]
+    ).dict()
+
+
+@app.get("/api/users/me/transactions/outgoing")
+@JWT.jwt_required()
+@with_user
+def get_current_user_transactions_outgoing():
+    limit = flask.request.args.get("limit", 20)
+    offset = flask.request.args.get("limit", 0)
+
+    current_user = flask.g.user
+
+    account1 = orm.aliased(model.UserAccount)
+    account2 = orm.aliased(model.UserAccount)
+    user1 = orm.aliased(model.User)
+    user2 = orm.aliased(model.User)
+
+    transactions = model.db.session.execute(
+        model.db.select(
+            model.Transaction.id,
+            model.Transaction.from_account_id,
+            model.Transaction.to_account_id,
+            model.Transaction.amount,
+            model.Transaction.description,
+            model.Transaction.status,
+            model.Transaction.created_at,
+            user1.name.label("from_user_name"),
+            user2.name.label("to_user_name"),
+        )
+        .join(account1, model.Transaction.from_account_id == account1.id)
+        .join(account2, model.Transaction.to_account_id == account2.id)
+        .join(user1, account1.user_id == user1.id)
+        .join(user2, account2.user_id == user2.id)
+        .where(model.Transaction.from_account_id == current_user.id)
+        .order_by(model.Transaction.created_at.desc())
+        .offset(offset)
+        .limit(limit)
+    ).all()
+
+    return dto.TransactionListDto(
+        items=[dto.TransactionDto.from_db_model(item) for item in transactions]
+    ).dict()
+
+
+@app.get("/api/users/me/transactions/incoming")
+@JWT.jwt_required()
+@with_user
+def get_current_user_transactions_incoming():
+    limit = flask.request.args.get("limit", 20)
+    offset = flask.request.args.get("limit", 0)
+
+    current_user = flask.g.user
+
+    account1 = orm.aliased(model.UserAccount)
+    account2 = orm.aliased(model.UserAccount)
+    user1 = orm.aliased(model.User)
+    user2 = orm.aliased(model.User)
+
+    transactions = model.db.session.execute(
+        model.db.select(
+            model.Transaction.id,
+            model.Transaction.from_account_id,
+            model.Transaction.to_account_id,
+            model.Transaction.amount,
+            model.Transaction.description,
+            model.Transaction.status,
+            model.Transaction.created_at,
+            user1.name.label("from_user_name"),
+            user2.name.label("to_user_name"),
+        )
+        .join(account1, model.Transaction.from_account_id == account1.id)
+        .join(account2, model.Transaction.to_account_id == account2.id)
+        .join(user1, account1.user_id == user1.id)
+        .join(user2, account2.user_id == user2.id)
+        .where(model.Transaction.to_account_id == current_user.id)
+        .order_by(model.Transaction.created_at.desc())
+        .offset(offset)
+        .limit(limit)
+    ).all()
+
+    return dto.TransactionListDto(
+        items=[dto.TransactionDto.from_db_model(item) for item in transactions]
+    ).dict()
+
+
+@app.get("/api/users/me/transactions/all")
+@JWT.jwt_required()
+@with_user
+def get_current_user_transactions_all():
+    limit = flask.request.args.get("limit", 20)
+    offset = flask.request.args.get("limit", 0)
+
+    current_user = flask.g.user
+
+    account1 = orm.aliased(model.UserAccount)
+    account2 = orm.aliased(model.UserAccount)
+    user1 = orm.aliased(model.User)
+    user2 = orm.aliased(model.User)
+
+    transactions = model.db.session.execute(
+        model.db.select(
+            model.Transaction.id,
+            model.Transaction.from_account_id,
+            model.Transaction.to_account_id,
+            model.Transaction.amount,
+            model.Transaction.description,
+            model.Transaction.status,
+            model.Transaction.created_at,
+            user1.name.label("from_user_name"),
+            user2.name.label("to_user_name"),
+        )
+        .join(account1, model.Transaction.from_account_id == account1.id)
+        .join(account2, model.Transaction.to_account_id == account2.id)
+        .join(user1, account1.user_id == user1.id)
+        .join(user2, account2.user_id == user2.id)
+        .where((model.Transaction.to_account_id == current_user.id) | (model.Transaction.from_account_id == current_user.id))
+        .order_by(model.Transaction.created_at.desc())
+        .offset(offset)
+        .limit(limit)
+    ).all()
+
+    return dto.TransactionListDto(
+        items=[dto.TransactionDto.from_db_model(item) for item in transactions]
     ).dict()
 
 
