@@ -4,8 +4,24 @@ services:
   app:
     build: .
     image: deadlock/lock-money:latest
+    restart: on-failure
     ports:
       - 5000:5000
     volumes:
       - ./:/app
+    environment:
+      DB_URI: postgresql+psycopg://lockmoney:lockmoney-pass@postgres:5432/lockmoney
     command: ./run-dev.sh
+    depends_on:
+      - postgres
+  postgres:
+    image: postgres:15
+    ports:
+      - 5432:5432
+    restart: on-failure
+    environment:
+      POSTGRES_PASSWORD: lockmoney-pass
+      POSTGRES_USER: lockmoney
+      POSTGRES_DB: lockmoney
+    volumes:
+      - ./data/postgres:/var/lib/postgresql/data
