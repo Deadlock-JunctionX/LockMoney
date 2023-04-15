@@ -1,0 +1,4 @@
+<template>
+  <AppFrame>
+  </AppFrame>
+</template>

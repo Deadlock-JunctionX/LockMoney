@@ -5,16 +5,18 @@
  */
 
 // Components
-import App from './App.vue'
+import App from "./App.vue";
+import AppFrame from "./components/AppFrame.vue";
+import TileButton from "./components/TileButton.vue";
 
 // Composables
-import { createApp } from 'vue'
+import { createApp } from "vue";
 
 // Plugins
-import { registerPlugins } from '@/plugins'
+import { registerPlugins } from "@/plugins";
 
-const app = createApp(App)
+const app = createApp(App);
 
-registerPlugins(app)
+registerPlugins(app);
 
-app.mount('#app')
+app.component("TileButton", TileButton).component("AppFrame", AppFrame).mount("#app");
