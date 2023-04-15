@@ -113,7 +113,6 @@ class TransactionListDto(BaseModel):
 class TransactionSubmitRequest(BaseModel):
     from_account_id: int | None = None
     to_account_id: int | None = None
-    from_name: str | None = None
     to_name: str | None = None
     from_bank: str | None = None
     to_bank: str | None = None
@@ -122,5 +121,5 @@ class TransactionSubmitRequest(BaseModel):
 
     amount: int
     description: str = Field(..., max_length=512)
-    pin: str
-    totp_token: str
+    pin: str | None = None
+    totp_token: str | None = None

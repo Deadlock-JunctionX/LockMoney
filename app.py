@@ -166,70 +166,104 @@ def impersonate_user():
 def submit_transaction():
     payload = dto.TransactionSubmitRequest.parse_obj(flask.request.json)
 
-    from_account = model.db.session.scalars(
-        model.db.select(model.UserAccount).where(
-            model.UserAccount.id == payload.from_account_id
-        )
-    ).first()
-    to_account = model.db.session.scalars(
-        model.db.select(model.UserAccount).where(
-            model.UserAccount.id == payload.to_account_id
-        )
-    ).first()
+    if payload.pin is None and payload.totp_token is None:
+        return {"detail": "MISSING_AUTHENTICATION"}, 401
 
-    if from_account is None or to_account is None:
-        return dict(detail="INVALID_ACCOUNT_IDS"), 400
+    from_account = None
+    if payload.from_account_id is not None:
+        from_account = model.db.session.scalars(
+            model.db.select(model.UserAccount).where(
+                model.UserAccount.id == payload.from_account_id
+            )
+        ).first()
+        if from_account is None:
+            return dict(detail="INVALID_ACCOUNT_ID"), 400
+
+    to_account = None
+    if payload.to_account_id is not None:
+        to_account = model.db.session.scalars(
+            model.db.select(model.UserAccount).where(
+                model.UserAccount.id == payload.to_account_id
+            )
+        ).first()
+        if to_account is None:
+            return dict(detail="INVALID_ACCOUNT_ID"), 400
 
     # Check source account for ownership
-    if from_account.user_id != flask.g.user.id:
-        return dict(detail="INVALID_SOURCE_ID"), 401
+    if from_account is not None:
+        if from_account.user_id != flask.g.user.id:
+            return dict(detail="INVALID_SOURCE_ID"), 401
 
     # Validate PIN
-    if not verify_password(payload.pin, flask.g.user.pin_hash):
-        return dict(detail="INCORRECT_PIN"), 401
+    if payload.pin is not None:
+        if not verify_password(payload.pin, flask.g.user.pin_hash):
+            return dict(detail="INCORRECT_PIN"), 401
 
-    if flask.g.user.totp_key is not None:
+    if payload.totp_token is not None and flask.g.user.totp_key is not None:
         # Validate TOTP
         totp_handler = TOTP(flask.g.user.totp_key)
         if not totp_handler.verify(payload.totp_token):
             return dict(detail="INVALID_TOTP"), 401
 
     # Lock both accounts to avoid race conditions
-    with RedisLock(
-        redis_client,
-        f"accounts/{from_account.id}",
-        timeout=REDIS_LOCK_TIMEOUT,
-        blocking=True,
-        blocking_timeout=30,
-    ), RedisLock(
-        redis_client,
-        f"accounts/{to_account.id}",
-        timeout=REDIS_LOCK_TIMEOUT,
-        blocking=True,
-        blocking_timeout=30,
-    ):
+    from_lock = None
+    if from_account is not None:
+        from_lock = RedisLock(
+            redis_client,
+            f"accounts/{from_account.id}",
+            timeout=REDIS_LOCK_TIMEOUT,
+            blocking=True,
+            blocking_timeout=30,
+        )
+        from_lock.acquire()
+
+    to_lock = None
+    if to_account is not None:
+        to_lock = RedisLock(
+            redis_client,
+            f"accounts/{to_account.id}",
+            timeout=REDIS_LOCK_TIMEOUT,
+            blocking=True,
+            blocking_timeout=30,
+        )
+        to_lock.acquire()
+
+    try:
         # Check remaining balance
-        if from_account.balance < payload.amount:
+        if from_account is not None and from_account.balance < payload.amount:
             return dict(detail="INSUFFICIENT_BALANCE"), 400
 
         # Perform transaction
         transaction = model.Transaction(
             from_account_id=payload.from_account_id,
             to_account_id=payload.to_account_id,
+            to_bank=payload.to_bank,
+            from_bank=payload.from_bank,
+            to_bank_account_number=payload.to_bank_account_number,
+            from_bank_account_number=payload.from_bank_account_number,
+            from_name=flask.g.user.name,
+            to_name=payload.to_name,
             amount=payload.amount,
             description=payload.description,
             status="success",
             trusted_app_id=flask.g.trusted_app_id,
         )
         model.db.session.add(transaction)
-        from_account.balance = from_account.balance - payload.amount
-        to_account.balance = to_account.balance + payload.amount
+        if from_account is not None:
+            from_account.balance = from_account.balance - payload.amount
+        if to_account is not None:
+            to_account.balance = to_account.balance + payload.amount
         model.db.session.commit()
         model.db.session.refresh(transaction)
 
         return dto.TransactionDto.from_db_model_plain(transaction).dict(
             exclude_none=True
         )
+    finally:
+        if from_lock is not None:
+            from_lock.release()
+        if to_lock is not None:
+            to_lock.release()
 
 
 @app.get("/api/accounts/search")
@@ -258,7 +292,7 @@ def search_accounts():
         return dict(detail="MISSING_QUERY"), 400
 
     query = model.db.select(
-        model.UserAccount.id, model.UserAccount.user_id, model.UserAccount.type
+        model.UserAccount.id, model.UserAccount.user_id
     ).join(model.User, model.UserAccount.user_id == model.User.id)
 
     if has_phone:
