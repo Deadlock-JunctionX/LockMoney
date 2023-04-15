@@ -31,7 +31,7 @@
         <div style="width: 100%" class="d-flex justify-space-between px-2">
           <TileButton
             href="/transfer"
-            icon="mdi-cash-multiple"
+            icon="mdi-layers"
             text="Chuyển tiền"
             color="#81afde"
           ></TileButton>

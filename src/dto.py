@@ -82,6 +82,8 @@ class TransactionDto(BaseModel):
             id=str(model.id),
             from_account_id=model.from_account_id,
             to_account_id=model.to_account_id,
+            from_bank_account_number=model.from_bank_account_number,
+            to_bank_account_number=model.to_bank_account_number,
             from_name=model.from_name,
             to_name=model.to_name,
             to_bank=model.to_bank,

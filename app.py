@@ -370,14 +370,14 @@ def get_current_user_accounts():
 @with_user("me/transactions")
 def get_current_user_transactions_outgoing():
     limit = flask.request.args.get("limit", 20)
-    offset = flask.request.args.get("limit", 0)
+    offset = flask.request.args.get("offset", 0)
 
     current_user = flask.g.user
 
     transactions = model.db.session.scalars(
         model.db.select(model.Transaction)
         .join(
-            model.UserAccount, model.Transaction.from_account_id == model.UserAccount.id
+            model.UserAccount, model.Transaction.from_account_id == model.UserAccount.id, isouter=True
         )
         .where(
             (model.UserAccount.user_id == current_user.id)
@@ -403,14 +403,14 @@ def get_current_user_transactions_outgoing():
 @with_user("me/transactions")
 def get_current_user_transactions_incoming():
     limit = flask.request.args.get("limit", 20)
-    offset = flask.request.args.get("limit", 0)
+    offset = flask.request.args.get("offset", 0)
 
     current_user = flask.g.user
 
     transactions = model.db.session.scalars(
         model.db.select(model.Transaction)
         .join(
-            model.UserAccount, model.Transaction.to_account_id == model.UserAccount.id
+            model.UserAccount, model.Transaction.to_account_id == model.UserAccount.id, isouter=True
         )
         .where(
             (model.UserAccount.user_id == current_user.id)
@@ -436,7 +436,7 @@ def get_current_user_transactions_incoming():
 @with_user("me/transactions")
 def get_current_user_transactions_all():
     limit = flask.request.args.get("limit", 20)
-    offset = flask.request.args.get("limit", 0)
+    offset = flask.request.args.get("offset", 0)
 
     current_user = flask.g.user
 
@@ -451,8 +451,8 @@ def get_current_user_transactions_all():
                 else_="INCOMING"
             ).label("current_user_context"),
         )
-        .join(account1, model.Transaction.from_account_id == account1.id)
-        .join(account2, model.Transaction.to_account_id == account2.id)
+        .join(account1, model.Transaction.from_account_id == account1.id, isouter=True)
+        .join(account2, model.Transaction.to_account_id == account2.id, isouter=True)
         .where(
             (
                 (account1.user_id == current_user.id)
