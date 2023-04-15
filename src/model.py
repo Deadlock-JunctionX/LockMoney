@@ -49,6 +49,6 @@ class Transaction(db.Model):
 
 
 class TrustedApp(db.Model):
-    id = Column(T.BigInteger().with_variant(T.Integer, "sqlite"), autoincrement=True, primary_key=True)
+    id = Column(T.String(64), primary_key=True)
     name = Column(T.String(128), nullable=False, unique=True)
     secret_key_hash = Column(T.String(256), nullable=False)

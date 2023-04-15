@@ -16,6 +16,14 @@ class UserInfoDto(BaseModel):
     name: str
     phone: str
 
+    @classmethod
+    def from_db_model(cls, model) -> "UserInfoDto":
+        return cls(
+            id=model.id,
+            name=model.name,
+            phone=model.phone,
+        )
+
 
 class AccountDto(BaseModel):
     id: int

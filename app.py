@@ -55,22 +55,25 @@ def with_user(scopes: list[str] | None | str = None):
 
             full_jwt = JWT.get_jwt()
             jwt_scopes = full_jwt.get("scopes")
+            trusted_app_id = full_jwt.get("trusted_app_id")
+
             if len(scopes) > 0 and jwt_scopes != "*":
                 if jwt_scopes is None or len(
                     set(scopes).intersection(jwt_scopes)
                 ) < len(scopes):
                     # If the token's scopes do not cover the required scopes, return a 401 error
-                    return dict(detail="Insufficient token scope"), 401
+                    return dict(detail="INSUFFICIENT_SCOPE"), 401
 
             user = model.db.session.scalars(
                 model.db.select(model.User).where(model.User.id == user_id)
             ).first()
 
             if user is None:
-                return dict(detail="Invalid token"), 400
+                return dict(detail="INVALID_TOKEN"), 400
 
             flask.g.user = user
             flask.g.token_scopes = jwt_scopes
+            flask.g.trusted_app_id = trusted_app_id
 
             return fn(*args, **kwargs)
 
@@ -79,7 +82,75 @@ def with_user(scopes: list[str] | None | str = None):
     return _with_user_wrapper
 
 
+def with_trusted_app():
+    def _with_trusted_app_wrapper(fn):
+        @functools.wraps(fn)
+        def decorate(*args, **kwargs):
+            app_id = flask.request.headers.get("x-app-id")
+            app_secret = flask.request.headers.get("x-app-secret")
+
+            if app_id is None or app_secret is None:
+                return {"detail": "MISSING_AUTH_HEADER"}, 401
+
+            app = model.db.session.scalars(
+                model.db.select(model.TrustedApp).where(model.TrustedApp.id == app_id)
+            ).first()
+
+            if app is None:
+                return {"detail": "INVALID_CREDENTIALS"}, 401
+
+            if not verify_password(app_secret, app.secret_key_hash):
+                return {"detail": "INVALID_CREDENTIALS"}, 401
+
+            flask.g.trusted_app = app
+
+            return fn(*args, **kwargs)
+        return decorate
+    return _with_trusted_app_wrapper
+
 # API routes
+
+
+@app.get("/api/users/search")
+@with_trusted_app()
+def search_users():
+    phone = flask.request.args.get("phone")
+    has_phone = phone is not None
+
+    if not has_phone:
+        return {"detail": "MISSING_QUERY"}, 400
+
+    user = model.db.session.scalars(
+        model.db.select(model.User).where(model.User.phone == phone)
+    ).first()
+
+    if user is None:
+        return {"detail": "NO_USER_FOUND"}, 404
+
+    return dto.UserInfoDto.from_db_model(user).dict()
+
+
+@app.post("/api/trusted-app/impersonate")
+@with_trusted_app()
+def impersonate_user():
+    user_id = flask.request.args["user_id"]
+
+    user = model.db.session.scalars(
+        model.db.select(model.User).where(model.User.id == user_id)
+    ).first()
+    if user is None:
+        return {"detail": "INVALID_ID"}, 400
+
+    token = JWT.create_access_token(
+        identity=user_id,
+        expires_delta=timedelta(minutes=20),
+        additional_claims={
+            "scopes": ["transactions/submit", "me/accounts"],
+            "trusted_app_id": flask.g.trusted_app.id
+        }
+    )
+
+    return dto.LoginResponse(token=token).dict()
 
 
 @app.post("/api/transactions/submit")
@@ -141,6 +212,7 @@ def submit_transaction():
             amount=payload.amount,
             description=payload.description,
             status="success",
+            trusted_app_id=flask.g.trusted_app_id,
         )
         model.db.session.add(transaction)
         from_account.balance = from_account.balance - payload.amount
@@ -156,6 +228,16 @@ def submit_transaction():
 @app.get("/api/accounts/search")
 @JWT.jwt_required()
 @with_user("accounts/search")
+def user_search_accounts():
+    return search_accounts()
+
+
+@app.get("/api/trusted-app/accounts/search")
+@with_trusted_app()
+def tapp_search_accounts():
+    return search_accounts()
+
+
 def search_accounts():
     phone = flask.request.args.get("phone")
     bank_id = flask.request.args.get("bank_id", type=int)
@@ -166,7 +248,7 @@ def search_accounts():
     has_bank_card = (bank_id is not None) and (bank_card_number is not None)
     has_phone = phone is not None
     if not (has_bank_account or has_bank_card or has_phone):
-        return dict(detail="Insufficient query"), 400
+        return dict(detail="MISSING_QUERY"), 400
 
     query = model.db.select(
         model.UserAccount.id, model.UserAccount.user_id, model.UserAccount.type
@@ -189,7 +271,7 @@ def search_accounts():
     account = model.db.session.execute(query).first()
 
     if account is None:
-        return dict(detail="Account not found"), 404
+        return dict(detail="ACCOUNT_NOT_FOUND"), 404
 
     return dto.AccountDto.from_db_model_private(account).dict(exclude_unset=True)
 
@@ -202,11 +284,11 @@ def login():
     ).first()
 
     if matched_user is None:
-        return dict(detail="Invalid login"), 401
+        return dict(detail="INVALID_LOGIN"), 401
 
     pass_hash = matched_user.password_hash
     if not verify_password(req.password, pass_hash):
-        return dict(detail="Invalid login"), 401
+        return dict(detail="INVALID_LOGIN"), 401
 
     access_token = JWT.create_access_token(
         identity=matched_user.id,
@@ -221,9 +303,7 @@ def login():
 @with_user("me/info")
 def get_current_user_info():
     current_user = flask.g.user
-    return dto.UserInfoDto(
-        id=current_user.id, name=current_user.name, phone=current_user.phone
-    ).dict()
+    return dto.UserInfoDto.from_db_model(current_user).dict()
 
 
 @app.get("/api/users/me/accounts")
@@ -276,7 +356,10 @@ def get_current_user_transactions_outgoing():
         .join(account2, model.Transaction.to_account_id == account2.id)
         .join(user1, account1.user_id == user1.id)
         .join(user2, account2.user_id == user2.id)
-        .where((account1.user_id == current_user.id) & (model.Transaction.status == "success"))
+        .where(
+            (account1.user_id == current_user.id)
+            & (model.Transaction.status == "success")
+        )
         .order_by(model.Transaction.created_at.desc())
         .offset(offset)
         .limit(limit)
@@ -318,7 +401,10 @@ def get_current_user_transactions_incoming():
         .join(account2, model.Transaction.to_account_id == account2.id)
         .join(user1, account1.user_id == user1.id)
         .join(user2, account2.user_id == user2.id)
-        .where((account2.user_id == current_user.id) & (model.Transaction.status == "success"))
+        .where(
+            (account2.user_id == current_user.id)
+            & (model.Transaction.status == "success")
+        )
         .order_by(model.Transaction.created_at.desc())
         .offset(offset)
         .limit(limit)
@@ -361,8 +447,10 @@ def get_current_user_transactions_all():
         .join(user1, account1.user_id == user1.id)
         .join(user2, account2.user_id == user2.id)
         .where(
-            ((account1.user_id == current_user.id)
-            | (account2.user_id == current_user.id))
+            (
+                (account1.user_id == current_user.id)
+                | (account2.user_id == current_user.id)
+            )
             & (model.Transaction.status == "success")
         )
         .order_by(model.Transaction.created_at.desc())

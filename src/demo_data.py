@@ -90,6 +90,7 @@ def reset_to_demo_data():
 
     logger.info("Add trusted apps")
     tapp1 = TrustedApp(
+        id="lockchat",
         name="Lock.Chat",
         secret_key_hash=hash_password("23oi23n9013292101n39013912339u3fnef1")
     )
