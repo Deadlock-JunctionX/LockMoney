@@ -86,8 +86,8 @@ def with_trusted_app():
     def _with_trusted_app_wrapper(fn):
         @functools.wraps(fn)
         def decorate(*args, **kwargs):
-            app_id = flask.request.headers.get("x-app-id")
-            app_secret = flask.request.headers.get("x-app-secret")
+            app_id = flask.request.headers.get("x-app-id", None)
+            app_secret = flask.request.headers.get("x-app-secret", None)
 
             if app_id is None or app_secret is None:
                 return {"detail": "MISSING_AUTH_HEADER"}, 401
@@ -133,7 +133,9 @@ def search_users():
 @app.post("/api/trusted-app/impersonate")
 @with_trusted_app()
 def impersonate_user():
-    user_id = flask.request.args["user_id"]
+    user_id = flask.request.args.get("user_id", type=int)
+    if user_id is None:
+        return {"detail": "MISSING_ID"}, 400
 
     user = model.db.session.scalars(
         model.db.select(model.User).where(model.User.id == user_id)
