@@ -43,7 +43,14 @@ def reset_to_demo_data():
         pin_hash=hash_password("123456"),
         totp_key="T5AII2XTVQYEV3HOKQWVRDZ37RKFZOCM",
     )
-    users = [u1, u2, u3, u4]
+    u5 = User(
+        name="Huyền Trang",
+        phone="0942740564",
+        password_hash=hash_password("12345678"),
+        pin_hash=hash_password("123456"),
+        totp_key="T5AII2XTVQYEV3HOKQWVRDZ37RKFZOCM",
+    )
+    users = [u1, u2, u3, u4, u5]
     db.session.add_all(users)
     db.session.commit()
     for user in users:
@@ -71,8 +78,13 @@ def reset_to_demo_data():
         balance=100_000_000,
         initial_balance=100_000_000,
     )
+    acc5_1 = UserAccount(
+        user_id=u5.id,
+        balance=20_000_000,
+        initial_balance=100_000_000,
+    )
 
-    accs = [acc1_1, acc2_1, acc3_1, acc4_1]
+    accs = [acc1_1, acc2_1, acc3_1, acc4_1, acc5_1]
     db.session.add_all(accs)
     db.session.commit()
     for acc in accs:
