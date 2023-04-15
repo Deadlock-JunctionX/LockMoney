@@ -13,3 +13,6 @@ new-revision message:
 
 migrate:
     alembic upgrade head
+
+prod: build stop
+    docker-compose -f docker-compose.prod.yml up -d
