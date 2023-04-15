@@ -33,7 +33,7 @@ CORS(app)
 JWTManager(app)
 
 app.config["SQLALCHEMY_DATABASE_URI"] = config.db_uri
-app.config["SQLALCHEMY_ENGINE_OPTIONS"] = {"pool_size": 5}
+app.config["SQLALCHEMY_ENGINE_OPTIONS"] = {"pool_size": 5, "echo": True}
 
 model.db.init_app(app)
 
@@ -268,6 +268,7 @@ def get_current_user_transactions_outgoing():
             model.Transaction.description,
             model.Transaction.status,
             model.Transaction.created_at,
+            model.Transaction.trusted_app_id,
             user1.name.label("from_user_name"),
             user2.name.label("to_user_name"),
         )
@@ -275,7 +276,7 @@ def get_current_user_transactions_outgoing():
         .join(account2, model.Transaction.to_account_id == account2.id)
         .join(user1, account1.user_id == user1.id)
         .join(user2, account2.user_id == user2.id)
-        .where(model.Transaction.from_account_id == current_user.id)
+        .where((account1.user_id == current_user.id) & (model.Transaction.status == "success"))
         .order_by(model.Transaction.created_at.desc())
         .offset(offset)
         .limit(limit)
@@ -309,6 +310,7 @@ def get_current_user_transactions_incoming():
             model.Transaction.description,
             model.Transaction.status,
             model.Transaction.created_at,
+            model.Transaction.trusted_app_id,
             user1.name.label("from_user_name"),
             user2.name.label("to_user_name"),
         )
@@ -316,7 +318,7 @@ def get_current_user_transactions_incoming():
         .join(account2, model.Transaction.to_account_id == account2.id)
         .join(user1, account1.user_id == user1.id)
         .join(user2, account2.user_id == user2.id)
-        .where(model.Transaction.to_account_id == current_user.id)
+        .where((account2.user_id == current_user.id) & (model.Transaction.status == "success"))
         .order_by(model.Transaction.created_at.desc())
         .offset(offset)
         .limit(limit)
@@ -350,6 +352,7 @@ def get_current_user_transactions_all():
             model.Transaction.description,
             model.Transaction.status,
             model.Transaction.created_at,
+            model.Transaction.trusted_app_id,
             user1.name.label("from_user_name"),
             user2.name.label("to_user_name"),
         )
@@ -358,8 +361,9 @@ def get_current_user_transactions_all():
         .join(user1, account1.user_id == user1.id)
         .join(user2, account2.user_id == user2.id)
         .where(
-            (model.Transaction.to_account_id == current_user.id)
-            | (model.Transaction.from_account_id == current_user.id)
+            ((account1.user_id == current_user.id)
+            | (account2.user_id == current_user.id))
+            & (model.Transaction.status == "success")
         )
         .order_by(model.Transaction.created_at.desc())
         .offset(offset)

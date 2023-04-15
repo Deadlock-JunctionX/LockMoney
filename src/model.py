@@ -45,3 +45,10 @@ class Transaction(db.Model):
     status = Column(T.Enum("2fa_required", "success", "failed", name="TransactionStatus"), nullable=False)
     transition_token_hash = Column(T.String(128), default=None, nullable=True)
     created_at = Column(T.DateTime(), nullable=False, default=datetime.now)
+    trusted_app_id = Column(T.BigInteger(), ForeignKey("trusted_app.id"), default=None, nullable=True)
+
+
+class TrustedApp(db.Model):
+    id = Column(T.BigInteger().with_variant(T.Integer, "sqlite"), autoincrement=True, primary_key=True)
+    name = Column(T.String(128), nullable=False, unique=True)
+    secret_key_hash = Column(T.String(256), nullable=False)

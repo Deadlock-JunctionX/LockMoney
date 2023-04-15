@@ -1,6 +1,6 @@
 from loguru import logger
 
-from src.model import db, User, UserAccount, Transaction
+from src.model import db, User, UserAccount, Transaction, TrustedApp
 from src.passhash import hash_password
 
 
@@ -9,6 +9,7 @@ def reset_to_demo_data():
     db.session.query(Transaction).delete()
     db.session.query(UserAccount).delete()
     db.session.query(User).delete()
+    db.session.query(TrustedApp).delete()
     db.session.commit()
 
     logger.info("Add users")
@@ -87,6 +88,15 @@ def reset_to_demo_data():
     for acc in [acc1_1, acc1_2, acc2_1, acc2_2, acc3_1]:
         db.session.refresh(acc)
 
+    logger.info("Add trusted apps")
+    tapp1 = TrustedApp(
+        name="Lock.Chat",
+        secret_key_hash=hash_password("23oi23n9013292101n39013912339u3fnef1")
+    )
+    db.session.add(tapp1)
+    db.session.commit()
+    db.session.refresh(tapp1)
+
     logger.info("Add transactions")
     transactions = [
         Transaction(
@@ -102,6 +112,7 @@ def reset_to_demo_data():
             amount=100_000,
             description="Test transaction 2",
             status="success",
+            trusted_app_id=tapp1.id,
         ),
         Transaction(
             from_account_id=acc2_2.id,

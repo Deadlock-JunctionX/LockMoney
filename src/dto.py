@@ -63,6 +63,7 @@ class TransactionDto(BaseModel):
     amount: int
     description: str
     status: str
+    trusted_app_id: int | None = None
     created_at: datetime
 
 
@@ -78,6 +79,7 @@ class TransactionDto(BaseModel):
             description=model.description,
             status=model.status,
             created_at=model.created_at,
+            trusted_app_id=model.trusted_app_id,
         )
 
     @classmethod
@@ -90,6 +92,7 @@ class TransactionDto(BaseModel):
             description=model.description,
             status=model.status,
             created_at=model.created_at,
+            trusted_app_id=model.trusted_app_id,
         )
 
 class TransactionListDto(BaseModel):
