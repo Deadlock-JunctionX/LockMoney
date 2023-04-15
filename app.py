@@ -12,6 +12,8 @@ from flask_jwt_extended import JWTManager
 from sqlalchemy import orm
 from loguru import logger
 from pyotp import TOTP
+from sqlalchemy.sql.functions import func
+from sqlalchemy import case as CASE
 
 from src.config import AppConfig
 from src import dto, model
@@ -105,8 +107,11 @@ def with_trusted_app():
             flask.g.trusted_app = app
 
             return fn(*args, **kwargs)
+
         return decorate
+
     return _with_trusted_app_wrapper
+
 
 # API routes
 
@@ -148,8 +153,8 @@ def impersonate_user():
         expires_delta=timedelta(minutes=20),
         additional_claims={
             "scopes": ["transactions/submit", "me/accounts"],
-            "trusted_app_id": flask.g.trusted_app.id
-        }
+            "trusted_app_id": flask.g.trusted_app.id,
+        },
     )
 
     return dto.LoginResponse(token=token).dict()
@@ -318,7 +323,6 @@ def get_current_user_accounts():
     accounts = model.db.session.scalars(
         model.db.select(model.UserAccount)
         .where(model.UserAccount.user_id == current_user.id)
-        .order_by(model.UserAccount.priority.desc())
         .limit(limit)
     ).all()
 
@@ -336,30 +340,13 @@ def get_current_user_transactions_outgoing():
 
     current_user = flask.g.user
 
-    account1 = orm.aliased(model.UserAccount)
-    account2 = orm.aliased(model.UserAccount)
-    user1 = orm.aliased(model.User)
-    user2 = orm.aliased(model.User)
-
-    transactions = model.db.session.execute(
-        model.db.select(
-            model.Transaction.id,
-            model.Transaction.from_account_id,
-            model.Transaction.to_account_id,
-            model.Transaction.amount,
-            model.Transaction.description,
-            model.Transaction.status,
-            model.Transaction.created_at,
-            model.Transaction.trusted_app_id,
-            user1.name.label("from_user_name"),
-            user2.name.label("to_user_name"),
+    transactions = model.db.session.scalars(
+        model.db.select(model.Transaction)
+        .join(
+            model.UserAccount, model.Transaction.from_account_id == model.UserAccount.id
         )
-        .join(account1, model.Transaction.from_account_id == account1.id)
-        .join(account2, model.Transaction.to_account_id == account2.id)
-        .join(user1, account1.user_id == user1.id)
-        .join(user2, account2.user_id == user2.id)
         .where(
-            (account1.user_id == current_user.id)
+            (model.UserAccount.user_id == current_user.id)
             & (model.Transaction.status == "success")
         )
         .order_by(model.Transaction.created_at.desc())
@@ -368,7 +355,12 @@ def get_current_user_transactions_outgoing():
     ).all()
 
     return dto.TransactionListDto(
-        items=[dto.TransactionDto.from_db_model(item) for item in transactions]
+        items=[
+            dto.TransactionDto.from_db_model(
+                item, context=dto.UserTransactionContext.OUTGOING
+            )
+            for item in transactions
+        ]
     ).dict()
 
 
@@ -381,30 +373,13 @@ def get_current_user_transactions_incoming():
 
     current_user = flask.g.user
 
-    account1 = orm.aliased(model.UserAccount)
-    account2 = orm.aliased(model.UserAccount)
-    user1 = orm.aliased(model.User)
-    user2 = orm.aliased(model.User)
-
-    transactions = model.db.session.execute(
-        model.db.select(
-            model.Transaction.id,
-            model.Transaction.from_account_id,
-            model.Transaction.to_account_id,
-            model.Transaction.amount,
-            model.Transaction.description,
-            model.Transaction.status,
-            model.Transaction.created_at,
-            model.Transaction.trusted_app_id,
-            user1.name.label("from_user_name"),
-            user2.name.label("to_user_name"),
+    transactions = model.db.session.scalars(
+        model.db.select(model.Transaction)
+        .join(
+            model.UserAccount, model.Transaction.to_account_id == model.UserAccount.id
         )
-        .join(account1, model.Transaction.from_account_id == account1.id)
-        .join(account2, model.Transaction.to_account_id == account2.id)
-        .join(user1, account1.user_id == user1.id)
-        .join(user2, account2.user_id == user2.id)
         .where(
-            (account2.user_id == current_user.id)
+            (model.UserAccount.user_id == current_user.id)
             & (model.Transaction.status == "success")
         )
         .order_by(model.Transaction.created_at.desc())
@@ -413,7 +388,12 @@ def get_current_user_transactions_incoming():
     ).all()
 
     return dto.TransactionListDto(
-        items=[dto.TransactionDto.from_db_model(item) for item in transactions]
+        items=[
+            dto.TransactionDto.from_db_model(
+                item, context=dto.UserTransactionContext.INCOMING
+            )
+            for item in transactions
+        ]
     ).dict()
 
 
@@ -428,26 +408,17 @@ def get_current_user_transactions_all():
 
     account1 = orm.aliased(model.UserAccount)
     account2 = orm.aliased(model.UserAccount)
-    user1 = orm.aliased(model.User)
-    user2 = orm.aliased(model.User)
 
     transactions = model.db.session.execute(
         model.db.select(
-            model.Transaction.id,
-            model.Transaction.from_account_id,
-            model.Transaction.to_account_id,
-            model.Transaction.amount,
-            model.Transaction.description,
-            model.Transaction.status,
-            model.Transaction.created_at,
-            model.Transaction.trusted_app_id,
-            user1.name.label("from_user_name"),
-            user2.name.label("to_user_name"),
+            model.Transaction,
+            CASE(
+                (account1.user_id == current_user.id, "OUTGOING"),
+                else_="INCOMING"
+            ).label("current_user_context"),
         )
         .join(account1, model.Transaction.from_account_id == account1.id)
         .join(account2, model.Transaction.to_account_id == account2.id)
-        .join(user1, account1.user_id == user1.id)
-        .join(user2, account2.user_id == user2.id)
         .where(
             (
                 (account1.user_id == current_user.id)
@@ -461,7 +432,7 @@ def get_current_user_transactions_all():
     ).all()
 
     return dto.TransactionListDto(
-        items=[dto.TransactionDto.from_db_model(item) for item in transactions]
+        items=[dto.TransactionDto.from_db_model(item, context) for item, context in transactions]
     ).dict()
 
 

@@ -1,5 +1,6 @@
 from pydantic import BaseModel, Field
 from datetime import datetime
+from enum import Enum
 
 
 class LoginRequest(BaseModel):
@@ -30,11 +31,6 @@ class AccountDto(BaseModel):
     user_id: int
     initial_balance: int | None = None
     balance: int | None = None
-    type: str
-    bank_id: int | None = None
-    bank_account_number: int | None = None
-    bank_card_number: int | None = None
-    priority: int | None = None
 
     @classmethod
     def from_db_model(cls, model) -> "AccountDto":
@@ -43,11 +39,6 @@ class AccountDto(BaseModel):
             user_id=model.user_id,
             initial_balance=model.initial_balance,
             balance=model.balance,
-            type=model.type,
-            bank_id=model.bank_id,
-            bank_account_number=model.bank_account_number,
-            bank_card_number=model.bank_card_number,
-            priority=model.priority,
         )
 
     @classmethod
@@ -55,34 +46,46 @@ class AccountDto(BaseModel):
         return cls(
             id=model.id,
             user_id=model.user_id,
-            type=model.type,
         )
 
 class AccountListDto(BaseModel):
     items: list[AccountDto]
 
 
+class UserTransactionContext(str, Enum):
+    INCOMING = "INCOMING"
+    OUTGOING = "OUTGOING"
+
+
 class TransactionDto(BaseModel):
     id: str
-    from_account_id: int
-    to_account_id: int
-    from_user_name: str | None = None
-    to_user_name: str | None = None
+    from_account_id: int | None = None
+    to_account_id: int | None = None
+    from_name: str | None = None
+    to_name: str | None = None
+    from_bank: str | None = None
+    to_bank: str | None = None
+    to_bank_account_number: str | None = None
+    from_bank_account_number: str | None = None
+    current_user_context: str | None = None
+
     amount: int
     description: str
     status: str
-    trusted_app_id: int | None = None
+    trusted_app_id: str | None = None
     created_at: datetime
 
 
     @classmethod
-    def from_db_model(cls, model) -> "TransactionDto":
+    def from_db_model(cls, model, context: UserTransactionContext | None = None) -> "TransactionDto":
         return cls(
             id=str(model.id),
             from_account_id=model.from_account_id,
             to_account_id=model.to_account_id,
-            from_user_name=model.from_user_name,
-            to_user_name=model.to_user_name,
+            from_name=model.from_name,
+            to_name=model.to_name,
+            to_bank=model.to_bank,
+            current_user_context=context or model.current_user_context,
             amount=model.amount,
             description=model.description,
             status=model.status,
@@ -108,8 +111,15 @@ class TransactionListDto(BaseModel):
 
 
 class TransactionSubmitRequest(BaseModel):
-    from_account_id: int
-    to_account_id: int
+    from_account_id: int | None = None
+    to_account_id: int | None = None
+    from_name: str | None = None
+    to_name: str | None = None
+    from_bank: str | None = None
+    to_bank: str | None = None
+    to_bank_account_number: str | None = None
+    from_bank_account_number: str | None = None
+
     amount: int
     description: str = Field(..., max_length=512)
     pin: str

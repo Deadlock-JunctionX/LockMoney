@@ -21,28 +21,32 @@ class User(db.Model):
 
 
 class UserAccount(db.Model):
-    id = Column(T.BigInteger().with_variant(T.Integer, "sqlite"), autoincrement=True, primary_key=True)
+    id = Column(T.BigInteger(), autoincrement=True, primary_key=True)
     user_id = Column(T.BigInteger(), ForeignKey("user.id"))
     initial_balance = Column(T.BigInteger(), default=0, nullable=False)
     balance = Column(T.BigInteger(), default=0, nullable=False)
-    type = Column(T.Enum("NATIVE", "BANK_ACCOUNT", "BANK_CARD", name="UserAccountType"), nullable=False)
-
-    # 1 = ABC Bank, 2 = Deadlock Bank
-    bank_id = Column(T.Integer(), default=None, nullable=True)
-
-    bank_account_number = Column(T.String(128), default=None, nullable=True)
-    bank_card_number = Column(T.String(128), default=None, nullable=True)
-    priority = Column(T.Integer(), default=1, nullable=False)
 
     user = relationship("User", back_populates="accounts")
 
 class Transaction(db.Model):
     id = Column(T.Uuid(as_uuid=True), primary_key=True, default=uuid.uuid4)
-    from_account_id = Column(T.BigInteger(), ForeignKey("user_account.id"), nullable=False)
-    to_account_id = Column(T.BigInteger(), ForeignKey("user_account.id"), nullable=False, default=None)
+
+    from_account_id = Column(T.BigInteger(), ForeignKey("user_account.id"), nullable=True)
+    to_account_id = Column(T.BigInteger(), ForeignKey("user_account.id"), nullable=True, default=None)
+
+    # 1 = ABC Bank, 2 = Deadlock Bank
+    to_bank = Column(T.String(), default=None, nullable=True)
+    from_bank = Column(T.String(), default=None, nullable=True)
+
+    to_bank_account_number = Column(T.String(128), default=None, nullable=True)
+    from_bank_account_number = Column(T.String(128), default=None, nullable=True)
+
+    from_name = Column(T.String(128), default=None, nullable=True)
+    to_name = Column(T.String(128), default=None, nullable=True)
+
     amount = Column(T.BigInteger(), nullable=False)
     description = Column(T.String(512), nullable=False)
-    status = Column(T.Enum("2fa_required", "success", "failed", name="TransactionStatus"), nullable=False)
+    status = Column(T.Enum("success", "failed", "pending", name="TransactionStatus"), nullable=False)
     transition_token_hash = Column(T.String(128), default=None, nullable=True)
     created_at = Column(T.DateTime(), nullable=False, default=datetime.now)
     trusted_app_id = Column(T.String(64), ForeignKey("trusted_app.id"), default=None, nullable=True)

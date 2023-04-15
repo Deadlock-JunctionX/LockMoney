@@ -1,8 +1,8 @@
 """Initial revision
 
-Revision ID: 8bc75fc206cb
+Revision ID: 33b0e9bb24da
 Revises: 
-Create Date: 2023-04-15 13:37:29.449000
+Create Date: 2023-04-15 20:12:53.419045
 
 """
 from alembic import op
@@ -10,7 +10,7 @@ import sqlalchemy as sa
 
 
 # revision identifiers, used by Alembic.
-revision = '8bc75fc206cb'
+revision = '33b0e9bb24da'
 down_revision = None
 branch_labels = None
 depends_on = None
@@ -37,25 +37,26 @@ def upgrade() -> None:
     sa.UniqueConstraint('phone')
     )
     op.create_table('user_account',
-    sa.Column('id', sa.BigInteger().with_variant(sa.Integer(), 'sqlite'), autoincrement=True, nullable=False),
+    sa.Column('id', sa.BigInteger(), autoincrement=True, nullable=False),
     sa.Column('user_id', sa.BigInteger(), nullable=True),
     sa.Column('initial_balance', sa.BigInteger(), nullable=False),
     sa.Column('balance', sa.BigInteger(), nullable=False),
-    sa.Column('type', sa.Enum('NATIVE', 'BANK_ACCOUNT', 'BANK_CARD', name='UserAccountType'), nullable=False),
-    sa.Column('bank_id', sa.Integer(), nullable=True),
-    sa.Column('bank_account_number', sa.String(length=128), nullable=True),
-    sa.Column('bank_card_number', sa.String(length=128), nullable=True),
-    sa.Column('priority', sa.Integer(), nullable=False),
     sa.ForeignKeyConstraint(['user_id'], ['user.id'], ),
     sa.PrimaryKeyConstraint('id')
     )
     op.create_table('transaction',
     sa.Column('id', sa.Uuid(), nullable=False),
-    sa.Column('from_account_id', sa.BigInteger(), nullable=False),
-    sa.Column('to_account_id', sa.BigInteger(), nullable=False),
+    sa.Column('from_account_id', sa.BigInteger(), nullable=True),
+    sa.Column('to_account_id', sa.BigInteger(), nullable=True),
+    sa.Column('to_bank', sa.String(), nullable=True),
+    sa.Column('from_bank', sa.String(), nullable=True),
+    sa.Column('to_bank_account_number', sa.String(length=128), nullable=True),
+    sa.Column('from_bank_account_number', sa.String(length=128), nullable=True),
+    sa.Column('from_name', sa.String(length=128), nullable=True),
+    sa.Column('to_name', sa.String(length=128), nullable=True),
     sa.Column('amount', sa.BigInteger(), nullable=False),
     sa.Column('description', sa.String(length=512), nullable=False),
-    sa.Column('status', sa.Enum('2fa_required', 'success', 'failed', name='TransactionStatus'), nullable=False),
+    sa.Column('status', sa.Enum('success', 'failed', 'pending', name='TransactionStatus'), nullable=False),
     sa.Column('transition_token_hash', sa.String(length=128), nullable=True),
     sa.Column('created_at', sa.DateTime(), nullable=False),
     sa.Column('trusted_app_id', sa.String(length=64), nullable=True),

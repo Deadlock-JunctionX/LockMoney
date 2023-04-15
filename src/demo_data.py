@@ -36,56 +36,46 @@ def reset_to_demo_data():
         pin_hash=hash_password("123456"),
         totp_key="T5AII2XTVQYEV3HOKQWVRDZ37RKFZOCM",
     )
-    db.session.add_all([u1, u2, u3])
+    u4 = User(
+        name="Hà Hồng Sơn",
+        phone="0365906800",
+        password_hash=hash_password("12345678"),
+        pin_hash=hash_password("123456"),
+        totp_key="T5AII2XTVQYEV3HOKQWVRDZ37RKFZOCM",
+    )
+    users = [u1, u2, u3, u4]
+    db.session.add_all(users)
     db.session.commit()
-    db.session.refresh(u1)
-    db.session.refresh(u2)
-    db.session.refresh(u3)
+    for user in users:
+        db.session.refresh(user)
 
     logger.info("Add user account")
     acc1_1 = UserAccount(
         user_id=u1.id,
-        type="NATIVE",
         balance=1_000_000,
         initial_balance=1_000_000,
-    )
-    acc1_2 = UserAccount(
-        user_id=u1.id,
-        type="BANK_ACCOUNT",
-        bank_id=1,
-        bank_account_number="2019441823",
-        priority=2,
-        balance=500_000,
-        initial_balance=500_000,
     )
 
     acc2_1 = UserAccount(
         user_id=u2.id,
-        type="NATIVE",
         balance=200_000,
         initial_balance=100_000,
     )
-    acc2_2 = UserAccount(
-        user_id=u2.id,
-        type="BANK_CARD",
-        bank_id=2,
-        bank_account_number="202392831",
-        priority=2,
-        balance=10_000_000,
-        initial_balance=1_000_000,
-    )
     acc3_1 = UserAccount(
         user_id=u3.id,
-        type="BANK_ACCOUNT",
-        bank_id=1,
-        bank_account_number="2029213291",
         balance=5_000_000,
-        initial_balance=1_000_000,
+        initial_balance=5_000_000,
+    )
+    acc4_1 = UserAccount(
+        user_id=u4.id,
+        balance=100_000_000,
+        initial_balance=100_000_000,
     )
 
-    db.session.add_all([acc1_1, acc1_2, acc2_1, acc2_2, acc3_1])
+    accs = [acc1_1, acc2_1, acc3_1, acc4_1]
+    db.session.add_all(accs)
     db.session.commit()
-    for acc in [acc1_1, acc1_2, acc2_1, acc2_2, acc3_1]:
+    for acc in accs:
         db.session.refresh(acc)
 
     logger.info("Add trusted apps")
@@ -103,6 +93,8 @@ def reset_to_demo_data():
         Transaction(
             from_account_id=acc1_1.id,
             to_account_id=acc2_1.id,
+            from_name="Phan Ngọc Lân",
+            to_name="Hoàng Đức Việt",
             amount=100_000,
             description="Test transaction 1",
             status="success",
@@ -111,16 +103,21 @@ def reset_to_demo_data():
             from_account_id=acc3_1.id,
             to_account_id=acc1_1.id,
             amount=100_000,
+            to_name="Phan Ngọc Lân",
+            from_name="Bùi Mạnh Tuấn",
             description="Test transaction 2",
             status="success",
             trusted_app_id=tapp1.id,
         ),
         Transaction(
-            from_account_id=acc2_2.id,
-            to_account_id=acc1_2.id,
-            amount=500_000,
-            description="Invalid transaction",
-            status="failed",
+            from_account_id=acc1_1.id,
+            to_bank="ABC Bank",
+            to_bank_account_number="204123823012",
+            status="success",
+            from_name="Phan Ngọc Lân",
+            to_name="Hà Hồng Sơn",
+            description="Test transaction 3",
+            amount=520_000
         )
     ]
     db.session.add_all(transactions)
