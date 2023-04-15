@@ -45,7 +45,7 @@ class Transaction(db.Model):
     status = Column(T.Enum("2fa_required", "success", "failed", name="TransactionStatus"), nullable=False)
     transition_token_hash = Column(T.String(128), default=None, nullable=True)
     created_at = Column(T.DateTime(), nullable=False, default=datetime.now)
-    trusted_app_id = Column(T.BigInteger(), ForeignKey("trusted_app.id"), default=None, nullable=True)
+    trusted_app_id = Column(T.String(64), ForeignKey("trusted_app.id"), default=None, nullable=True)
 
 
 class TrustedApp(db.Model):

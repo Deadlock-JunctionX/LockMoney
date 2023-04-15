@@ -1,8 +1,8 @@
 """Initial revision
 
-Revision ID: 2f326c461822
+Revision ID: 8bc75fc206cb
 Revises: 
-Create Date: 2023-04-15 13:35:43.951513
+Create Date: 2023-04-15 13:37:29.449000
 
 """
 from alembic import op
@@ -10,7 +10,7 @@ import sqlalchemy as sa
 
 
 # revision identifiers, used by Alembic.
-revision = '2f326c461822'
+revision = '8bc75fc206cb'
 down_revision = None
 branch_labels = None
 depends_on = None
@@ -58,7 +58,7 @@ def upgrade() -> None:
     sa.Column('status', sa.Enum('2fa_required', 'success', 'failed', name='TransactionStatus'), nullable=False),
     sa.Column('transition_token_hash', sa.String(length=128), nullable=True),
     sa.Column('created_at', sa.DateTime(), nullable=False),
-    sa.Column('trusted_app_id', sa.BigInteger(), nullable=True),
+    sa.Column('trusted_app_id', sa.String(length=64), nullable=True),
     sa.ForeignKeyConstraint(['from_account_id'], ['user_account.id'], ),
     sa.ForeignKeyConstraint(['to_account_id'], ['user_account.id'], ),
     sa.ForeignKeyConstraint(['trusted_app_id'], ['trusted_app.id'], ),
