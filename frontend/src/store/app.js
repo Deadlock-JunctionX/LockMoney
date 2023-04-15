@@ -9,7 +9,6 @@ export const useAppStore = defineStore("app", {
   }),
   actions: {
     fetchUser() {
-      console.log(this);
       return axios
         .get("/users/me/info", {
           headers: {

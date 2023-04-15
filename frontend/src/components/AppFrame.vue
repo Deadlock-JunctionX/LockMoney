@@ -2,17 +2,16 @@
   <div>
     <slot></slot>
 
-    <v-bottom-navigation bg-color="primary">
-      <v-btn href="/transactions">
-        <v-icon>mdi-view-list</v-icon>
+    <v-bottom-navigation grow density="comfortable" :height="64" color="primary">
+      <v-btn to="/transactions">
+        <v-icon size="x-large">mdi-view-list</v-icon>
         Giao dịch
       </v-btn>
-      <v-btn href="/">
-        <v-icon>mdi-home</v-icon>
-        Màn hình chính
+      <v-btn to="/home">
+        <v-icon size="xx-large">mdi-home-circle</v-icon>
       </v-btn>
-      <v-btn href="/settings">
-        <v-icon>mdi-account</v-icon>
+      <v-btn to="/settings">
+        <v-icon size="x-large">mdi-account</v-icon>
         Cài đặt
       </v-btn>
     </v-bottom-navigation>

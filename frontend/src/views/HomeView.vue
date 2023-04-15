@@ -7,10 +7,10 @@
         <v-card-text class="text-right text-caption">
           Xin chào, <b>{{ user.name }}</b>
         </v-card-text>
-        <v-card-text class="mt-n4 text-left"> Tài khoản 1 </v-card-text>
+        <v-card-text class="mt-n4 text-left"> Số dư </v-card-text>
 
         <v-card-text class="mt-n6 text-left text-h5">
-          10,000,000 VND
+          {{ accountBalance }} VND
         </v-card-text>
       </v-card>
     </div>
@@ -51,17 +51,46 @@
 <script>
 import adImage from "../assets/junctionx.jpg";
 import { useAppStore } from "../store/app.js";
+import axios from "axios";
 
 const store = useAppStore();
 
 export default {
   computed: {
     adImage() {
-      return adImage
+      return adImage;
     },
     user() {
       return store.user;
+    },
+    accountBalance() {
+      if (!this.account) {
+        return ""
+      }
+      return new Intl.NumberFormat().format(this.account.balance);
     }
+  },
+  data() {
+    return {
+      account: null,
+    };
+  },
+  methods: {
+    fetchAccount() {
+      return axios
+        .get("/users/me/accounts", {
+          params: {
+            limit: 1,
+          },
+        })
+        .then((response) => {
+          this.account = response.data.items[0];
+        })
+        .catch(() => {});
+    },
+  },
+  mounted() {
+    this.fetchAccount();
   },
 };
 </script>

@@ -7,9 +7,11 @@ const routes = [
   {
     path: '/',
     component: () => import('@/layouts/default/Default.vue'),
+    redirect: "/home",
     children: [
       {
-        path: '',
+        path: 'home',
+        name: 'home',
         component: () => import(/* webpackChunkName: "home" */ '@/views/HomeView.vue'),
         meta: {
           requiresAuth: true
@@ -17,6 +19,7 @@ const routes = [
       },
       {
         path: 'settings',
+        name: 'settings',
         component: () => import(/* webpackChunkName: "settings" */ '@/views/SettingsView.vue'),
         meta: {
           requiresAuth: true
@@ -24,6 +27,7 @@ const routes = [
       },
       {
         path: 'transactions',
+        name: 'transactions',
         component: () => import(/* webpackChunkName: "transactions" */ '@/views/TransactionsView.vue'),
         meta: {
           requiresAuth: true
@@ -31,6 +35,7 @@ const routes = [
       },
       {
         path: 'login',
+        name: 'login',
         component: () => import(/* webpackChunkName: "login" */ '@/views/LoginView.vue'),
         meta: {
           requiresAuth: false
