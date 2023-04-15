@@ -1,7 +1,9 @@
 import flask
 import flask_jwt_extended as JWT
 import functools
+import redis
 
+from redis.lock import Lock as RedisLock
 from pydantic.error_wrappers import ValidationError
 from flask import Flask
 from datetime import timedelta
@@ -17,9 +19,12 @@ from src.background import BackgroundJobExecutor
 from src.demo_data import reset_to_demo_data
 from src.passhash import verify_password
 
+REDIS_LOCK_TIMEOUT = 600
+
 logger.level("INFO")
 config = AppConfig()
 job_executor = BackgroundJobExecutor()
+redis_client = redis.Redis.from_url(config.redis_uri)
 
 app = Flask(__name__, static_folder="dist/")
 app.config["JWT_SECRET_KEY"] = config.secret_key
@@ -51,7 +56,9 @@ def with_user(scopes: list[str] | None | str = None):
             full_jwt = JWT.get_jwt()
             jwt_scopes = full_jwt.get("scopes")
             if len(scopes) > 0 and jwt_scopes != "*":
-                if jwt_scopes is None or len(set(scopes).intersection(jwt_scopes)) < len(scopes):
+                if jwt_scopes is None or len(
+                    set(scopes).intersection(jwt_scopes)
+                ) < len(scopes):
                     # If the token's scopes do not cover the required scopes, return a 401 error
                     return dict(detail="Insufficient token scope"), 401
 
@@ -68,6 +75,7 @@ def with_user(scopes: list[str] | None | str = None):
             return fn(*args, **kwargs)
 
         return decorate
+
     return _with_user_wrapper
 
 
@@ -81,10 +89,14 @@ def submit_transaction():
     payload = dto.TransactionSubmitRequest.parse_obj(flask.request.json)
 
     from_account = model.db.session.scalars(
-        model.db.select(model.UserAccount).where(model.UserAccount.id == payload.from_account_id)
+        model.db.select(model.UserAccount).where(
+            model.UserAccount.id == payload.from_account_id
+        )
     ).first()
     to_account = model.db.session.scalars(
-        model.db.select(model.UserAccount).where(model.UserAccount.id == payload.to_account_id)
+        model.db.select(model.UserAccount).where(
+            model.UserAccount.id == payload.to_account_id
+        )
     ).first()
 
     if from_account is None or to_account is None:
@@ -93,10 +105,6 @@ def submit_transaction():
     # Check source account for ownership
     if from_account.user_id != flask.g.user.id:
         return dict(detail="INVALID_SOURCE_ID"), 401
-
-    # Check remaining balance
-    if from_account.balance < payload.amount:
-        return dict(detail="INSUFFICIENT_BALANCE"), 400
 
     # Validate PIN
     if not verify_password(payload.pin, flask.g.user.pin_hash):
@@ -108,21 +116,41 @@ def submit_transaction():
         if not totp_handler.verify(payload.totp_token):
             return dict(detail="INVALID_TOTP"), 401
 
-    # Perform transaction
-    transaction = model.Transaction(
-        from_account_id=payload.from_account_id,
-        to_account_id=payload.to_account_id,
-        amount=payload.amount,
-        description=payload.description,
-        status="success"
-    )
-    model.db.session.add(transaction)
-    from_account.balance = from_account.balance - payload.amount
-    to_account.balance = to_account.balance + payload.amount
-    model.db.session.commit()
-    model.db.session.refresh(transaction)
+    # Lock both accounts to avoid race conditions
+    with RedisLock(
+        redis_client,
+        f"accounts/{from_account.id}",
+        timeout=REDIS_LOCK_TIMEOUT,
+        blocking=True,
+        blocking_timeout=30,
+    ), RedisLock(
+        redis_client,
+        f"accounts/{to_account.id}",
+        timeout=REDIS_LOCK_TIMEOUT,
+        blocking=True,
+        blocking_timeout=30,
+    ):
+        # Check remaining balance
+        if from_account.balance < payload.amount:
+            return dict(detail="INSUFFICIENT_BALANCE"), 400
 
-    return dto.TransactionDto.from_db_model_plain(transaction).dict(exclude_none=True)
+        # Perform transaction
+        transaction = model.Transaction(
+            from_account_id=payload.from_account_id,
+            to_account_id=payload.to_account_id,
+            amount=payload.amount,
+            description=payload.description,
+            status="success",
+        )
+        model.db.session.add(transaction)
+        from_account.balance = from_account.balance - payload.amount
+        to_account.balance = to_account.balance + payload.amount
+        model.db.session.commit()
+        model.db.session.refresh(transaction)
+
+        return dto.TransactionDto.from_db_model_plain(transaction).dict(
+            exclude_none=True
+        )
 
 
 @app.get("/api/accounts/search")
@@ -182,9 +210,7 @@ def login():
 
     access_token = JWT.create_access_token(
         identity=matched_user.id,
-        additional_claims={
-            "scopes": "*"
-        },
+        additional_claims={"scopes": "*"},
         expires_delta=timedelta(days=7),
     )
     return dto.LoginResponse(token=access_token).dict()
