@@ -5,7 +5,7 @@
       <!-- Balance display -->
       <v-card flat rounded class="banner-inner" density="compact">
         <v-card-text class="text-right text-caption">
-          Xin chào, USER
+          Xin chào, <b>{{ user.name }}</b>
         </v-card-text>
         <v-card-text class="mt-n4 text-left"> Tài khoản 1 </v-card-text>
 
@@ -17,7 +17,7 @@
 
     <v-container>
       <v-row class="py-2 px-2">
-        <div style="width: 100%" class="d-flex justify-space-between px-4">
+        <div style="width: 100%" class="d-flex justify-space-between px-2">
           <TileButton
             href="/transfer"
             icon="mdi-cash-multiple"
@@ -49,7 +49,21 @@
 </template>
 
 <script>
-export default {};
+import adImage from "../assets/junctionx.jpg";
+import { useAppStore } from "../store/app.js";
+
+const store = useAppStore();
+
+export default {
+  computed: {
+    adImage() {
+      return adImage
+    },
+    user() {
+      return store.user;
+    }
+  },
+};
 </script>
 
 <style scoped>

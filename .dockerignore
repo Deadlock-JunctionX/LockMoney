@@ -1,4 +1,4 @@
 data/
 Dockerfile
 docker-compose*
-.*
+frontend/node_modules/

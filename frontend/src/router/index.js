@@ -1,5 +1,7 @@
 // Composables
 import { createRouter, createWebHistory } from 'vue-router'
+import { useAppStore } from '@/store/app'
+import Cookies from 'js-cookie'
 
 const routes = [
   {
@@ -27,6 +29,13 @@ const routes = [
           requiresAuth: true
         }
       },
+      {
+        path: 'login',
+        component: () => import(/* webpackChunkName: "login" */ '@/views/LoginView.vue'),
+        meta: {
+          requiresAuth: false
+        }
+      },
     ],
   },
 ]
@@ -34,6 +43,28 @@ const routes = [
 const router = createRouter({
   history: createWebHistory(process.env.BASE_URL),
   routes,
+})
+
+router.beforeEach((to) => {
+  if (to.meta.requiresAuth) {
+    const accessToken = Cookies.get("access_token");
+    if (!accessToken) {
+      return {
+        path: '/login',
+        query: { redirect: to.path },
+      }
+    }
+
+    const store = useAppStore()
+    return store.fetchUser().catch(() => {
+      // this route requires auth, check if logged in
+      // if not, redirect to login page.
+      return {
+        path: '/login',
+        query: { redirect: to.path },
+      }
+    })
+  }
 })
 
 export default router

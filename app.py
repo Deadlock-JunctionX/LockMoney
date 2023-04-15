@@ -26,7 +26,7 @@ config = AppConfig()
 job_executor = BackgroundJobExecutor()
 redis_client = redis.Redis.from_url(config.redis_uri)
 
-app = Flask(__name__, static_folder="dist/")
+app = Flask(__name__, static_folder="/dist/")
 app.config["JWT_SECRET_KEY"] = config.secret_key
 
 CORS(app)
