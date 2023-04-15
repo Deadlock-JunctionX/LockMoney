@@ -2,7 +2,7 @@
   <div>
     <slot></slot>
 
-    <v-bottom-navigation grow density="comfortable" :height="64" color="primary">
+    <v-bottom-navigation elevation="8" grow density="comfortable" :height="64" color="primary">
       <v-btn to="/transactions">
         <v-icon size="x-large">mdi-view-list</v-icon>
         Giao dịch

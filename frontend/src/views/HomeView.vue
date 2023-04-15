@@ -7,11 +7,22 @@
         <v-card-text class="text-right text-caption">
           Xin chào, <b>{{ user.name }}</b>
         </v-card-text>
-        <v-card-text class="mt-n4 text-left"> Số dư </v-card-text>
+        <v-card-actions class="mt-n4 text-left text-body">
+          Số dư
+        </v-card-actions>
 
-        <v-card-text class="mt-n6 text-left text-h5">
-          {{ accountBalance }} VND
-        </v-card-text>
+        <v-card-actions class="mt-n6 text-left text-h5">
+          <div v-if="!hideBalance">{{ accountBalance }} VND</div>
+          <div v-if="hideBalance">••••••••••••</div>
+
+          <v-spacer></v-spacer>
+
+          <v-btn icon size="x-small" @click="hideBalance = !hideBalance">
+            <v-icon size="large">
+              {{ hideBalance ? "mdi-eye-off" : "mdi-eye" }}
+            </v-icon>
+          </v-btn>
+        </v-card-actions>
       </v-card>
     </div>
 
@@ -65,14 +76,16 @@ export default {
     },
     accountBalance() {
       if (!this.account) {
-        return ""
+        return "";
       }
       return new Intl.NumberFormat().format(this.account.balance);
-    }
+    },
   },
   data() {
     return {
       account: null,
+      hideBalance: true,
+      updateBalanceInt: null,
     };
   },
   methods: {
@@ -91,6 +104,16 @@ export default {
   },
   mounted() {
     this.fetchAccount();
+    this.updateBalanceInt = setInterval(() => {
+      if (!this.hideBalance) {
+        this.fetchAccount();
+      }
+    }, 5000);
+  },
+  unmounted() {
+    if (this.updateBalanceInt) {
+      clearInterval(this.updateBalanceInt);
+    }
   },
 };
 </script>
