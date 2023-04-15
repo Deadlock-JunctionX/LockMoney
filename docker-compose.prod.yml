@@ -5,20 +5,19 @@ services:
     build: .
     image: deadlock/lock-money:latest
     restart: always
-    ports:
-      - 5000:5000
+    network_mode: host
     volumes:
       - ./:/app
     environment:
-      DB_URI: postgresql+psycopg://lockmoney:lockmoney-pass@postgres:5432/lockmoney
+      DB_URI: postgresql+psycopg://lockmoney:lockmoney-pass@localhost:5432/lockmoney
+      REDIS_URI: redis://localhost:6379/0
     command: ./run-prod.sh
     depends_on:
       - postgres
       - redis
   postgres:
     image: postgres:15
-    ports:
-      - 5432:5432
+    network_mode: host
     restart: always
     environment:
       POSTGRES_PASSWORD: lockmoney-pass
@@ -30,5 +29,4 @@ services:
   redis:
     image: redis:5
     restart: always
-    ports:
-      - 6379:6379
+    network_mode: host
