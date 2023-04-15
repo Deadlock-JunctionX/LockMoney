@@ -30,7 +30,7 @@
       <v-row class="py-2 px-2">
         <div style="width: 100%" class="d-flex justify-space-between px-2">
           <TileButton
-            href="/transfer"
+            href="#"
             icon="mdi-layers"
             text="Chuyển tiền"
             color="#81afde"
