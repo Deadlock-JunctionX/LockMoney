@@ -17,6 +17,7 @@ def reset_to_demo_data():
         phone="0949791149",
         password_hash=hash_password("12345678"),
         pin_hash=hash_password("123456"),
+        totp_key="XDTK6E22TYLGHN2CJLF232H2UWRWXWG7",
     )
 
     u2 = User(
@@ -24,6 +25,7 @@ def reset_to_demo_data():
         phone="0886272382",
         password_hash=hash_password("12345678"),
         pin_hash=hash_password("123456"),
+        totp_key="F5HCEAEDW27AGCCOBX3RDHLFDTZFFNLI",
     )
 
     u3 = User(
@@ -31,6 +33,7 @@ def reset_to_demo_data():
         phone="0389020687",
         password_hash=hash_password("12345678"),
         pin_hash=hash_password("123456"),
+        totp_key="T5AII2XTVQYEV3HOKQWVRDZ37RKFZOCM",
     )
     db.session.add_all([u1, u2, u3])
     db.session.commit()

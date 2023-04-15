@@ -10,3 +10,4 @@ flask-jwt-extended[asymmetric_crypto]==4.4.4
 passlib==1.7.4
 psycopg==3.1.8
 psycopg_binary==3.1.8
+pyotp==2.8.0

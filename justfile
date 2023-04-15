@@ -6,7 +6,7 @@ stop:
 
 dev: build stop
     docker-compose up -d
-    docker-compose logs -f
+    docker-compose logs -f app
 
 new-revision message:
     alembic revision --autogenerate -m '{{ message }}'
