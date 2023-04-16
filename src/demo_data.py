@@ -65,7 +65,7 @@ def reset_to_demo_data():
 
     acc2_1 = UserAccount(
         user_id=u2.id,
-        balance=200_000,
+        balance=200_000_000,
         initial_balance=100_000,
     )
     acc3_1 = UserAccount(
@@ -130,7 +130,27 @@ def reset_to_demo_data():
             to_name="Hà Hồng Sơn",
             description="Test transaction 3",
             amount=520_000
-        )
+        ),
+        Transaction(
+            from_account_id=acc2_1.id,
+            to_bank="VC Bank",
+            to_bank_account_number="204123823012",
+            status="success",
+            from_name="Hoàng Đức Việt",
+            to_name="Bùi Mạnh Tuấn",
+            description="Việt chuyển tiền",
+            amount=320_000
+        ),
+        Transaction(
+            to_account_id=acc2_1.id,
+            from_bank="VC Bank",
+            from_bank_account_number="204123823012",
+            status="success",
+            to_name="Hoàng Đức Việt",
+            from_name="Bùi Mạnh Tuấn",
+            description="Tuấn chuyển tiền",
+            amount=630_000
+        ),
     ]
     db.session.add_all(transactions)
     db.session.commit()
