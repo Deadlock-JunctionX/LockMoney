@@ -1,6 +1,6 @@
 <template>
   <div>
-    <a class="link-wrapper" :href="href">
+    <router-link class="link-wrapper" :to="href">
       <div class="text-center">
         <v-icon :color="color" size="48">{{ icon }}</v-icon>
 
@@ -8,7 +8,7 @@
           {{ text }}
         </p>
       </div>
-    </a>
+    </router-link>
   </div>
 </template>
 

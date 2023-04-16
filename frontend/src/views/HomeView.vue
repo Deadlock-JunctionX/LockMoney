@@ -13,7 +13,7 @@
 
         <v-card-actions class="mt-n6 text-left text-h5">
           <div v-if="!hideBalance">{{ accountBalance }} VND</div>
-          <div v-if="hideBalance">••••••••••••</div>
+          <div v-if="hideBalance">•••••••••••••••••</div>
 
           <v-spacer></v-spacer>
 
