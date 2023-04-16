@@ -41,6 +41,11 @@
             </span>
           </p>
 
+          <p v-if="transaction.trusted_app_id" class="text-caption" style="color: #536DFE">
+            <br>
+            Giao dịch thực hiện qua Lock.Chat
+          </p>
+
           <p style="font-size: 8pt" class="mt-4">
             ID: {{ transaction.id }}
           </p>
